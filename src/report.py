@@ -23,6 +23,21 @@ def _trend(label: str, growing: Optional[bool]) -> str:
     return f"{label}:{'↑' if growing else '↓'}"
 
 
+def _date(d) -> str:
+    return d.isoformat() if d is not None else "—"
+
+
+def _rsi(x: Optional[float]) -> str:
+    return f"{x:.1f}" if x is not None else "—"
+
+
+_CROSS_LABEL = {"golden": ":large_green_circle: GC", "death": ":red_circle: DC"}
+
+
+def _cross(x: Optional[str]) -> str:
+    return _CROSS_LABEL.get(x, "—")
+
+
 def build_blocks(candidates: list, date_str: Optional[str] = None) -> dict:
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")
 
@@ -50,7 +65,7 @@ def build_blocks(candidates: list, date_str: Optional[str] = None) -> dict:
 
     lines = []
     for i, c in enumerate(candidates, 1):
-        v, f = c.val, c.fund
+        v, f, t = c.val, c.fund, c.tech
         name = c.company or c.ticker
         line = (
             f"*{i}. <https://finviz.com/quote.ashx?t={c.ticker}|{c.ticker}>* — {name}\n"
@@ -60,7 +75,10 @@ def build_blocks(candidates: list, date_str: Optional[str] = None) -> dict:
             f"   DCF: {_money(v.dcf_value)} / Graham: {_money(v.graham_value)} / "
             f"時価総額: {_money(f.market_cap)}\n"
             f"   {_trend('売上', f.revenue_growing)}  {_trend('純利益', f.net_income_growing)}  "
-            f"<https://www.tradingview.com/symbols/NASDAQ-{c.ticker}/|TradingView> "
+            f"前回決算: {_date(f.prev_earnings_date)} / 次回決算: {_date(f.next_earnings_date)}\n"
+            f"   RSI14: {_rsi(t.rsi14)} / RSI30: {_rsi(t.rsi30)} / RSI90: {_rsi(t.rsi90)}  "
+            f"MACDクロス: 昨日 {_cross(t.macd_cross_yesterday)} / 2日前 {_cross(t.macd_cross_2days_ago)}\n"
+            f"   <https://www.tradingview.com/symbols/NASDAQ-{c.ticker}/|TradingView> "
             f"<https://www.alphaspread.com/security/nasdaq/{c.ticker.lower()}/summary|AlphaSpread>"
         )
         lines.append(line)

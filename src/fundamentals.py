@@ -1,4 +1,5 @@
 """Step 2 相当: yfinance で業績トレンドと評価に必要な財務データを取得する。"""
+import datetime as _dt
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
@@ -25,6 +26,9 @@ class Fundamentals:
     revenue_history: list = field(default_factory=list)
     # 純利益トレンド（古い→新しい順）
     net_income_history: list = field(default_factory=list)
+    # 決算日
+    prev_earnings_date: Optional[_dt.date] = None
+    next_earnings_date: Optional[_dt.date] = None
 
     @property
     def revenue_growing(self) -> Optional[bool]:
@@ -82,7 +86,42 @@ def fetch(ticker: str) -> Optional[Fundamentals]:
         f.revenue_history = _row(income, "Total Revenue")
         f.net_income_history = _row(income, "Net Income", "Net Income Common Stockholders")
 
+        f.prev_earnings_date, f.next_earnings_date = _earnings_dates(tk)
+
         return f
     except Exception as exc:  # noqa: BLE001
         logger.warning("%s の財務取得に失敗: %s", ticker, exc)
         return None
+
+
+def _earnings_dates(tk) -> tuple:
+    """前回・次回の決算日を (prev, next) のタプルで返す。取得できない場合は None。"""
+    prev_d = next_d = None
+    try:
+        ed = tk.get_earnings_dates(limit=8)
+        if ed is not None and not ed.empty:
+            tz = ed.index.tz
+            now = pd.Timestamp.now(tz=tz) if tz is not None else pd.Timestamp.now()
+            past = ed.index[ed.index < now]
+            future = ed.index[ed.index >= now]
+            if len(past) > 0:
+                prev_d = past.max().date()
+            if len(future) > 0:
+                next_d = future.min().date()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("%s の earnings_dates 取得に失敗: %s", tk.ticker, exc)
+
+    # フォールバック: calendar 属性から次回決算日を取得
+    if next_d is None:
+        try:
+            cal = tk.calendar
+            if isinstance(cal, dict):
+                eds = cal.get("Earnings Date")
+                if eds:
+                    val = eds[0] if isinstance(eds, list) else eds
+                    if hasattr(val, "date"):
+                        next_d = val.date()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("%s の calendar 取得に失敗: %s", tk.ticker, exc)
+
+    return prev_d, next_d

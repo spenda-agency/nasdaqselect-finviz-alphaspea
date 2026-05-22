@@ -91,8 +91,9 @@ Finviz で見つけた銘柄が、「ただ業績が悪くて株価が下がっ�
 | ステップ | 本実装での取得方法 | 備考 |
 | --- | --- | --- |
 | Step 1 | **Finviz スクリーナーをスクレイピング**（`finvizfinance`） | 公式 API は有料の Finviz Elite。Finviz 側の bot 対策で 403 になる場合あり |
-| Step 2 | **`yfinance`** で売上・純利益・FCF の推移を取得 | TradingView に公式公開 API が無いため代替 |
+| Step 2 | **`yfinance`** で売上・純利益・FCF の推移と決算日を取得 | TradingView に公式公開 API が無いため代替 |
 | Step 3 | **適正株価を自前計算**（簡易 DCF ＋ グレアム数の平均） | Alpha Spread に公開 API が無いため独自算出 |
+| 補助 | **`yfinance` の株価履歴から RSI14/30/90 と MACD クロスを自前計算** | Google Finance に公開 API が無いため代替 |
 
 > Step 3 の Intrinsic Value は Alpha Spread の値ではなく、当リポジトリが計算した参考値です。
 > 通知内には各銘柄の Finviz / TradingView / Alpha Spread への直接リンクを併記するので、
@@ -105,7 +106,13 @@ Finviz で見つけた銘柄が、「ただ業績が悪くて株価が下がっ�
    売上・純利益がともに減少している銘柄は除外。
 3. **Step 3**: 簡易 DCF（FCFE 近似）とグレアム数で適正株価を算出し、
    安全域 `(適正株価 − 現在株価) / 適正株価` が `MIN_MARGIN_OF_SAFETY`（既定 15%）以上のものを採用。
-4. 安全域の大きい順に並べ、上位 `TOP_N` 件（既定 10）を Slack に通知。
+4. 各候補について **前回・次回の決算日**（`yfinance` の `get_earnings_dates` / `calendar`）と
+   **RSI14 / RSI30 / RSI90 / MACD クロス（昨日・2日前）** を株価履歴から自前計算し、
+   通知の補助情報として付加します。
+   - RSI は Wilder の指数平滑、MACD は標準パラメータ (12, 26, 9)。
+   - MACD ヒストグラムが負→正に転じれば :large_green_circle: `GC`（ゴールデン）、
+     正→負なら :red_circle: `DC`（デッド）。
+5. 安全域の大きい順に並べ、上位 `TOP_N` 件（既定 10）を Slack に通知。
 
 ### セットアップ
 
@@ -153,8 +160,9 @@ SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXX/YYY/ZZZ" python -m src.m
 src/
   config.py        # 設定（環境変数で上書き可能）
   screener.py      # Step 1: Finviz スクリーニング
-  fundamentals.py  # Step 2: yfinance で財務トレンド取得
+  fundamentals.py  # Step 2: yfinance で財務トレンド・決算日を取得
   valuation.py     # Step 3: DCF + グレアム数で適正株価を算出
+  technicals.py    # 補助: RSI14/30/90 と MACD クロスを自前計算
   pipeline.py      # 3ステップの連結と絞り込み
   report.py        # Slack 用メッセージ整形
   notify_slack.py  # Slack Webhook 送信

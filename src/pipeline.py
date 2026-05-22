@@ -3,8 +3,9 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from . import config, fundamentals, screener, valuation
+from . import config, fundamentals, screener, technicals, valuation
 from .fundamentals import Fundamentals
+from .technicals import Technicals
 from .valuation import Valuation
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ class Candidate:
     sector: Optional[str]
     fund: Fundamentals
     val: Valuation
+    tech: Technicals
 
 
 def _pick_ticker_column(row) -> Optional[str]:
@@ -60,6 +62,9 @@ def run() -> list:
         if f.revenue_growing is False and f.net_income_growing is False:
             continue
 
+        # テクニカル指標は通知の補助情報として取得（失敗しても候補は残す）
+        tech = technicals.fetch(t)
+
         candidates.append(
             Candidate(
                 ticker=t,
@@ -67,6 +72,7 @@ def run() -> list:
                 sector=f.sector,
                 fund=f,
                 val=v,
+                tech=tech,
             )
         )
 
