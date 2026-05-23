@@ -27,10 +27,20 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    candidates = pipeline.run()
-    logger.info("最終候補: %d 銘柄", len(candidates))
+    result = pipeline.run()
+    logger.info(
+        "ファネル: Nasdaq=%s, 割安通過=%s, 分析=%d, 業績=%d, 安全域=%d, RSI=%d, BB=%d, 通知=%d",
+        result.funnel.nasdaq_total,
+        result.funnel.finviz_passed,
+        result.funnel.analyzed,
+        result.funnel.after_trend,
+        result.funnel.after_valuation,
+        result.funnel.after_rsi,
+        result.funnel.after_bb,
+        result.funnel.notified,
+    )
 
-    payload = report.build_blocks(candidates)
+    payload = report.build_blocks(result)
 
     if args.dry_run:
         print(json.dumps(payload, ensure_ascii=False, indent=2))

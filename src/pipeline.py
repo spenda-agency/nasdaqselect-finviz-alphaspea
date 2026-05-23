@@ -1,7 +1,10 @@
-"""3ステップを連結して、過小評価されている有望銘柄を抽出するパイプライン。"""
+"""3ステップを連結して、過小評価されている有望銘柄を抽出するパイプライン。
+
+各段階の通過数（ファネル）も併せて返し、Slack 通知に反映する。
+"""
 import logging
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 from . import config, fundamentals, screener, technicals, valuation
 from .fundamentals import Fundamentals
@@ -21,6 +24,24 @@ class Candidate:
     tech: Technicals
 
 
+@dataclass
+class FunnelCounts:
+    nasdaq_total: Optional[int] = None      # Nasdaq 上場全銘柄数
+    finviz_passed: Optional[int] = None     # 割安フィルタ通過の総ヒット数（Finviz 側）
+    analyzed: int = 0                       # 詳細分析対象（MAX_TICKERS でカット後）
+    after_trend: int = 0                    # 業績トレンドが衰退でない銘柄
+    after_valuation: int = 0                # 安全域 ≥ MIN_MARGIN_OF_SAFETY
+    after_rsi: int = 0                      # RSI14 ≤ 50
+    after_bb: int = 0                       # 現値 > ボリンジャー下限
+    notified: int = 0                       # 最終的に Slack 通知される件数
+
+
+@dataclass
+class PipelineResult:
+    funnel: FunnelCounts = field(default_factory=FunnelCounts)
+    candidates: List[Candidate] = field(default_factory=list)
+
+
 def _pick_ticker_column(row) -> Optional[str]:
     for key in ("Ticker", "ticker", "Symbol"):
         if key in row and row[key]:
@@ -28,11 +49,14 @@ def _pick_ticker_column(row) -> Optional[str]:
     return None
 
 
-def run() -> list:
-    # Step 1: Finviz で割安候補を絞り込む
-    df = screener.screen_undervalued()
+def run() -> PipelineResult:
+    funnel = FunnelCounts()
+    funnel.nasdaq_total = screener.get_nasdaq_total()
+
+    df, finviz_total = screener.screen_undervalued()
+    funnel.finviz_passed = finviz_total
     if df.empty:
-        return []
+        return PipelineResult(funnel=funnel)
 
     company_by_ticker = {}
     tickers = []
@@ -43,27 +67,41 @@ def run() -> list:
         tickers.append(t)
         company_by_ticker[t] = row.get("Company") or row.get("company")
     tickers = tickers[: config.MAX_TICKERS]
-    logger.info("詳細分析対象: %d 銘柄", len(tickers))
+    funnel.analyzed = len(tickers)
+    logger.info("詳細分析対象: %d 銘柄", funnel.analyzed)
 
-    candidates = []
+    candidates: List[Candidate] = []
     for t in tickers:
-        # Step 2: 業績トレンドと財務データを取得
+        # Step 2: 業績トレンドと財務データ
         f = fundamentals.fetch(t)
         if f is None:
             continue
-        # Step 3: 適正株価と安全域を算出
-        v = valuation.value(f)
+        if f.revenue_growing is False and f.net_income_growing is False:
+            continue
+        funnel.after_trend += 1
 
+        # Step 3: 適正株価と安全域
+        v = valuation.value(f)
         if v.margin_of_safety is None:
             continue
         if v.margin_of_safety < config.MIN_MARGIN_OF_SAFETY:
             continue
-        # 業績が明確に縮小している銘柄（売上・利益とも減少）は除外
-        if f.revenue_growing is False and f.net_income_growing is False:
-            continue
+        funnel.after_valuation += 1
 
-        # テクニカル指標は通知の補助情報として取得（失敗しても候補は残す）
+        # 補助: テクニカル指標による絞り込み
         tech = technicals.fetch(t)
+
+        if tech.rsi14 is None or tech.rsi14 > 50:
+            continue
+        funnel.after_rsi += 1
+
+        if (
+            tech.latest_close is None
+            or tech.bb_lower is None
+            or tech.latest_close <= tech.bb_lower
+        ):
+            continue
+        funnel.after_bb += 1
 
         candidates.append(
             Candidate(
@@ -76,6 +114,8 @@ def run() -> list:
             )
         )
 
-    # 安全域の大きい順に並べる
     candidates.sort(key=lambda c: c.val.margin_of_safety or 0, reverse=True)
-    return candidates[: config.TOP_N]
+    candidates = candidates[: config.TOP_N]
+    funnel.notified = len(candidates)
+
+    return PipelineResult(funnel=funnel, candidates=candidates)
