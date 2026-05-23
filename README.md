@@ -13,8 +13,8 @@ Finviz（広く浅く条件検索）→ TradingView（業績トレンド確認�
 | Step 2 | [TradingView](https://tradingview.com) | 業績推移と競合比較で「本物の割安株」を判別 |
 | Step 3 | [Alpha Spread](https://alphaspread.com) | 理論上の適正株価と現在株価のズレ（安全域）を確認 |
 
-> 本リポジトリには、この手順を自動実行して **毎日 16:00 JST に Slack へ過小評価銘柄を通知する**
-> パイプラインを同梱しています。詳細は [自動化パイプライン](#自動化パイプライン毎日-1600-jst) を参照してください。
+> 本リポジトリには、この手順を自動実行して **火〜土 16:00 JST に Slack へ過小評価銘柄を通知する**
+> パイプラインを同梱しています。詳細は [自動化パイプライン](#自動化パイプライン火土-1600-jst) を参照してください。
 
 ---
 
@@ -80,7 +80,7 @@ Finviz で見つけた銘柄が、「ただ業績が悪くて株価が下がっ�
 
 ---
 
-## 自動化パイプライン（毎日 16:00 JST）
+## 自動化パイプライン（火〜土 16:00 JST）
 
 上記 3 ステップを自動実行し、過小評価されている Nasdaq 銘柄と詳細データを **Slack に通知**します。
 
@@ -119,11 +119,29 @@ Finviz で見つけた銘柄が、「ただ業績が悪くて株価が下がっ�
 
 ### セットアップ
 
-1. **Slack Incoming Webhook** を作成し、その URL を GitHub リポジトリの
-   **Settings → Secrets and variables → Actions** に `SLACK_WEBHOOK_URL` という名前で登録します。
-2. これだけで、`.github/workflows/daily-screen.yml` が **毎日 07:00 UTC（= 16:00 JST）** に自動実行されます。
-3. 初回は手動実行で動作確認することを推奨します
-   （**Actions → Daily undervalued Nasdaq screen → Run workflow**、`dry_run=true` で Slack 送信なし）。
+Slack への送信方法は **Bot Token 方式（推奨）** と **Incoming Webhook 方式** の2通りに対応しています。
+
+#### A. Bot Token 方式（推奨／チャンネル指定可）
+
+1. Slack App を作成し、Bot Token Scopes に `chat:write` を付与してワークスペースにインストール。
+2. Bot を投稿先チャンネルに招待（`/invite @YourBot`）。
+3. GitHub リポジトリの **Settings → Secrets and variables → Actions** で
+   `SLACK_BOT_TOKEN`（`xoxb-...`）を **Secret** として登録。
+4. チャンネル ID は workflow の env で既に `C0B4BPA4W2D` に設定済み。変更したい場合は
+   リポジトリの **Variables** に `SLACK_CHANNEL` を作成して上書き可能。
+
+#### B. Incoming Webhook 方式（簡易）
+
+1. Slack の Incoming Webhook URL を作成。
+2. GitHub の **Settings → Secrets → Actions** に `SLACK_WEBHOOK_URL` として登録。
+
+> 両方設定されている場合は **Bot Token 方式が優先** されます。
+
+#### 動作確認
+
+- **Actions → Daily undervalued Nasdaq screen → Run workflow** で `dry_run=true` を選ぶと
+  Slack 送信なしでログ／ペイロードを出力できます。
+- cron は `0 7 * * 2-6`（**UTC 07:00 火〜土 = JST 16:00 火〜土**）で自動実行されます。
 
 ### ローカル実行
 
@@ -141,7 +159,9 @@ SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXX/YYY/ZZZ" python -m src.m
 
 | 変数 | 既定値 | 意味 |
 | --- | --- | --- |
-| `SLACK_WEBHOOK_URL` | （必須） | Slack Incoming Webhook URL |
+| `SLACK_BOT_TOKEN` | （Bot Token 方式で必須） | `xoxb-...` で始まる Slack Bot Token |
+| `SLACK_CHANNEL` | `C0B4BPA4W2D` | 送信先チャンネル ID（Bot Token 方式で使用） |
+| `SLACK_WEBHOOK_URL` | （Webhook 方式で必須） | Slack Incoming Webhook URL |
 | `FINVIZ_PE` / `FINVIZ_PEG` / `FINVIZ_PS` | `Under 15` / `Under 1` / `Under 3` | スクリーニング閾値 |
 | `MAX_TICKERS` | `25` | 詳細分析にかける最大銘柄数 |
 | `TOP_N` | `10` | 通知する上位銘柄数 |
@@ -170,5 +190,5 @@ src/
   report.py        # Slack 用メッセージ整形
   notify_slack.py  # Slack Webhook 送信
   main.py          # エントリポイント
-.github/workflows/daily-screen.yml  # 毎日 16:00 JST の定期実行
+.github/workflows/daily-screen.yml  # 火〜土 16:00 JST の定期実行
 ```

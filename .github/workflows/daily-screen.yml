@@ -2,8 +2,8 @@ name: Daily undervalued Nasdaq screen
 
 on:
   schedule:
-    # 07:00 UTC = 16:00 JST（毎日）
-    - cron: "0 7 * * *"
+    # 火〜土 07:00 UTC = 火〜土 16:00 JST
+    - cron: "0 7 * * 2-6"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -32,6 +32,8 @@ jobs:
 
       - name: Run screening pipeline
         env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || 'C0B4BPA4W2D' }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
