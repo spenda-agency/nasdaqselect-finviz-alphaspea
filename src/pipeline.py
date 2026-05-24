@@ -34,6 +34,8 @@ class FunnelCounts:
     after_rsi: int = 0                      # RSI14 ≤ 50
     after_bb: int = 0                       # 現値 > ボリンジャー下限
     notified: int = 0                       # 最終的に Slack 通知される件数
+    # 業績トレンド OK まで残った銘柄コード（Top10 の比較対象として保持）
+    trend_passed_tickers: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -79,6 +81,7 @@ def run() -> PipelineResult:
         if f.revenue_growing is False and f.net_income_growing is False:
             continue
         funnel.after_trend += 1
+        funnel.trend_passed_tickers.append(t)
 
         # Step 3: 適正株価と安全域
         v = valuation.value(f)

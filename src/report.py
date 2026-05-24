@@ -128,6 +128,24 @@ def build_blocks(result: PipelineResult, date_str: Optional[str] = None) -> dict
             }
         )
 
+    # 業績トレンド OK まで残ったが Top10 入りしなかった銘柄をコードのみカンマ区切りで列挙
+    top_set = {c.ticker for c in candidates}
+    others = [t for t in funnel.trend_passed_tickers if t not in top_set]
+    if others:
+        blocks.append({"type": "divider"})
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*業績トレンド OK・Top{config.TOP_N} 圏外の銘柄 "
+                        f"({len(others)} 件)*\n`{','.join(others)}`"
+                    ),
+                },
+            }
+        )
+
     blocks.append(
         {
             "type": "context",
