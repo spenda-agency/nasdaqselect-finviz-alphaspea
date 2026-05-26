@@ -11,6 +11,11 @@ on:
         type: boolean
         default: false
 
+# GITHUB_TOKEN に最低限の権限を明示。Org/Repo の既定が "no permissions" でも
+# checkout が 401 を受けないようにする。
+permissions:
+  contents: read
+
 concurrency:
   group: daily-screen
   cancel-in-progress: false
