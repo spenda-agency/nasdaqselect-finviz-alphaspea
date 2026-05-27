@@ -26,6 +26,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Org の既定権限で GITHUB_TOKEN が 401 になるため、明示的に PAT を使う。
+          # PAT には `contents: read`（fine-grained）または `repo`（classic）を付与すること。
+          token: ${{ secrets.GH_PAT }}
 
       - uses: actions/setup-python@v5
         with:
