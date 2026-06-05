@@ -82,18 +82,30 @@ Finviz で見つけた銘柄が、「ただ業績が悪くて株価が下がっ�
 
 ## 自動化パイプライン（火〜土 16:00 JST）
 
-上記 3 ステップを自動実行し、過小評価されている Nasdaq 銘柄と詳細データを **Slack に通知**します。
+上記 3 ステップを自動実行し、過小評価されている **Nasdaq（US）** および **東証プライム（JP）** 銘柄と
+詳細データを **Slack に通知**します。
+
+### 対応市場と実行スケジュール
+
+| 市場 | 取引所 | 実行曜日（JST） |
+| --- | --- | --- |
+| **US** | Nasdaq | 火〜土 16:00（US 市場クローズ後） |
+| **JP** | 東証プライム | 月〜金 16:00（東証クローズ後） |
+
+GitHub Actions の cron は月〜土の 16:00 JST に統合して起動し、`src/main.py` が JST 曜日に
+基づいて当日対象市場（US / JP / 両方）を判定して実行、結果は **同じ Slack メッセージ**
+にまとめて投稿します。
 
 ### データ取得の現実（重要）
 
 3 サイトとも「きれいな公開 API」が揃っているわけではないため、本実装は以下の方針を取ります。
 
-| ステップ | 本実装での取得方法 | 備考 |
-| --- | --- | --- |
-| Step 1 | **Finviz スクリーナーをスクレイピング**（`finvizfinance`） | 公式 API は有料の Finviz Elite。Finviz 側の bot 対策で 403 になる場合あり |
-| Step 2 | **`yfinance`** で売上・純利益・FCF の推移と決算日を取得 | TradingView に公式公開 API が無いため代替 |
-| Step 3 | **適正株価を自前計算**（簡易 DCF ＋ グレアム数の平均） | Alpha Spread に公開 API が無いため独自算出 |
-| 補助 | **`yfinance` の株価履歴から RSI14/30/90 と MACD クロスを自前計算** | Google Finance に公開 API が無いため代替 |
+| ステップ | US (Nasdaq) | JP (東証プライム) | 備考 |
+| --- | --- | --- | --- |
+| Step 1 | Finviz スクリーナー (`finvizfinance`) | JPX 公式 Excel から東証プライム全銘柄を取得し、`yfinance` で P/E・PEG・P/S を並列フェッチして同じフィルタを適用 | Finviz は JP 株未対応 |
+| Step 2 | `yfinance` で売上・純利益・FCF の推移と決算日を取得 | 同左（`.T` サフィックス付きティッカー） | TradingView に公開 API が無いため代替 |
+| Step 3 | 適正株価を自前計算（簡易 DCF ＋ グレアム数） | 同左（JPY のまま計算） | Alpha Spread に公開 API が無いため独自算出 |
+| 補助 | `yfinance` の株価履歴から RSI14/30/90・ボリンジャーバンド・MACD を自前計算 | 同左 | Google Finance に公開 API が無いため代替 |
 
 > Step 3 の Intrinsic Value は Alpha Spread の値ではなく、当リポジトリが計算した参考値です。
 > 通知内には各銘柄の Finviz / TradingView / Alpha Spread への直接リンクを併記するので、

@@ -2,3 +2,6 @@ finvizfinance>=0.14.6
 yfinance>=0.2.40
 pandas>=2.0.0
 requests>=2.31.0
+# JP 銘柄: JPX Excel (data_j.xls) のパース
+openpyxl>=3.1.0
+xlrd>=2.0.1
