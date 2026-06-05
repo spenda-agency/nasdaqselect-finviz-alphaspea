@@ -1,4 +1,4 @@
-"""エントリポイント: 当日の対象市場を判定し、各市場の結果を 1 つの Slack 通知にまとめる。
+"""エントリポイント: 当日の対象市場を判定し、各市場の Top N 候補を Google Sheets に書き出す。
 
 スケジュール仕様:
   - US (Nasdaq): 火〜土 16:00 JST （US 市場クローズ後）
@@ -9,18 +9,17 @@ GitHub Actions 側は Mon-Sat 07:00 UTC (= 16:00 JST) で一律トリガし、
 
 ローカル実行例:
     python -m src.main --dry-run
-    SLACK_BOT_TOKEN=... SLACK_CHANNEL=... python -m src.main
+    GOOGLE_CREDENTIALS_JSON=... SPREADSHEET_ID=... python -m src.main
     python -m src.main --markets US,JP      # 曜日判定を無視して両方走らせる
 """
 import argparse
 import datetime as _dt
 import json
 import logging
-import os
 import sys
 from typing import List
 
-from . import notify_slack, pipeline, report
+from . import pipeline, sheets_writer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,11 +50,11 @@ def _markets_for_today() -> List[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="過小評価銘柄を抽出して Slack 通知")
+    parser = argparse.ArgumentParser(description="過小評価銘柄を抽出して Google Sheets に書き出す")
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Slack に送らず、生成したペイロードを標準出力に表示する",
+        help="Sheets に書かず、生成した行データを標準出力に表示する",
     )
     parser.add_argument(
         "--markets",
@@ -93,15 +92,22 @@ def main() -> int:
         )
         results.append(result)
 
-    payload = report.build_blocks(results)
-
     if args.dry_run:
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        today = _today_jst().isoformat()
+        preview = {
+            r.market: {
+                "tab": sheets_writer.TAB_NAME.get(r.market),
+                "today_rows": sheets_writer.build_today_rows(r, today),
+            }
+            for r in results
+        }
+        print(json.dumps(preview, ensure_ascii=False, indent=2, default=str))
         return 0
 
-    ok = notify_slack.send(payload)
+    ok = sheets_writer.write_results(results)
     return 0 if ok else 1
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

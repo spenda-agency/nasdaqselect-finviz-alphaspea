@@ -42,6 +42,10 @@ jobs:
 
       - name: Run screening pipeline
         env:
+          # 出力先: Google Sheets (Service Account 認証)
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID || '1GG561CtYIi30c3ljsDaAdUd2ddF18z4J21fQ-N-vo6Y' }}
+          # 旧 Slack 設定 (現在は未使用、必要なら notify_slack.py から再有効化可)
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || 'C0B4BPA4W2D' }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
