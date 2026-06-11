@@ -4,6 +4,7 @@ US / JP の両市場に対応。市場ごとに ``run(market='US' | 'JP')`` で�
 各段階の通過数（ファネル）も併せて返し、Slack 通知に反映する。
 """
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -13,6 +14,11 @@ from .technicals import Technicals
 from .valuation import Valuation
 
 logger = logging.getLogger(__name__)
+
+# JP は yfinance で 1,500+ 銘柄を捌くためレート制限を喰らいやすい。
+# スクリーニング直後にクールダウンを入れ、詳細分析中も per-call で間隔を空ける。
+JP_COOLDOWN_SEC = 90
+JP_PER_CALL_DELAY_SEC = 1.0
 
 
 @dataclass
@@ -87,11 +93,18 @@ def run(market: str = "US") -> PipelineResult:
     funnel.analyzed = len(tickers)
     logger.info("[%s] 詳細分析対象: %d 銘柄", market, funnel.analyzed)
 
+    # JP はスクリーニングで Yahoo を叩きすぎているため、詳細分析前に冷却する。
+    if market == "JP" and tickers:
+        logger.info("[JP] Yahoo クールダウン: %d 秒待機", JP_COOLDOWN_SEC)
+        time.sleep(JP_COOLDOWN_SEC)
+
     candidates: List[Candidate] = []
     for t in tickers:
         # Step 2: 業績トレンドと財務データ
         f = fundamentals.fetch(t)
         if f is None:
+            if market == "JP":
+                time.sleep(JP_PER_CALL_DELAY_SEC)
             continue
         if f.revenue_growing is False and f.net_income_growing is False:
             continue
@@ -132,6 +145,10 @@ def run(market: str = "US") -> PipelineResult:
                 tech=tech,
             )
         )
+
+        # JP は per-call で間隔を空けてレート制限を回避する
+        if market == "JP":
+            time.sleep(JP_PER_CALL_DELAY_SEC)
 
     candidates.sort(key=lambda c: c.val.margin_of_safety or 0, reverse=True)
     candidates = candidates[: config.TOP_N]

@@ -25,9 +25,10 @@ PE_MAX = 15.0
 PEG_MAX = 1.0
 PS_MAX = 3.0
 
-# yfinance 並列フェッチのワーカー数。Yahoo のレート制限に配慮しつつ
-# 1,600 銘柄を ~3 分で走り切れる値。
-PARALLEL_WORKERS = 10
+# yfinance 並列フェッチのワーカー数。Yahoo のレート制限を回避するため控えめに。
+# 過去ログで 10 ワーカーは 1,500+ 銘柄を捌くと Yahoo に 429/401 を返されたため 3 に削減。
+# 結果として ~5-8 分かかる想定。
+PARALLEL_WORKERS = 3
 
 # モジュールレベルキャッシュ: 同一プロセス内では JPX を 1 回だけ取得
 _universe_cache: Optional[List[Tuple[str, str]]] = None
