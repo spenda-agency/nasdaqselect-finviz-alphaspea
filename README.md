@@ -1,8 +1,7 @@
 # 割安株を見つけるための「3ステップ」巡回手順
-
 無料ツールを組み合わせて、Nasdaq の割安株候補を効率よく絞り込むためのワークフローです。
 まずは無料スクリーナーで広く候補を絞り、徐々に詳細な分析サイトへ移っていくのが最も効率的です。
-
+https://docs.google.com/spreadsheets/d/1GG561CtYIi30c3ljsDaAdUd2ddF18z4J21fQ-N-vo6Y/
 ```
 Finviz（広く浅く条件検索）→ TradingView（業績トレンド確認）→ Alpha Spread（適正株価とのズレ確認）
 ```
