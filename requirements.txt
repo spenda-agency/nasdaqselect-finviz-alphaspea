@@ -5,6 +5,9 @@ requests>=2.31.0
 # JP 銘柄: JPX Excel (data_j.xls) のパース
 openpyxl>=3.1.0
 xlrd>=2.0.1
-# Google Sheets 書き込み
+# Google Sheets / Drive 書き込み
 gspread>=6.0.0
 google-auth>=2.28.0
+google-api-python-client>=2.130.0
+# Claude API による銘柄分析
+anthropic>=0.40.0

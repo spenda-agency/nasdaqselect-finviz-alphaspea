@@ -30,6 +30,9 @@ class Candidate:
     fund: Fundamentals
     val: Valuation
     tech: Technicals
+    # US 限定: Claude による分析結果
+    score: Optional[int] = None              # 0-100、未分析時 None
+    analysis_url: Optional[str] = None       # Drive にアップロードしたレポートの URL
 
 
 @dataclass
@@ -152,6 +155,58 @@ def run(market: str = "US") -> PipelineResult:
 
     candidates.sort(key=lambda c: c.val.margin_of_safety or 0, reverse=True)
     candidates = candidates[: config.TOP_N]
-    funnel.notified = len(candidates)
 
+    # US の Top10 は Claude で詳細分析し、レポートを Drive へ保存。
+    # スコア < MIN_ANALYSIS_SCORE はシート出力からは除外（Drive には全件保存）。
+    if market == "US" and candidates:
+        _analyze_us_candidates(candidates)
+        candidates = [
+            c for c in candidates
+            if c.score is not None and c.score >= config.MIN_ANALYSIS_SCORE
+        ]
+
+    funnel.notified = len(candidates)
     return PipelineResult(market=market, funnel=funnel, candidates=candidates)
+
+
+def _analyze_us_candidates(candidates: List[Candidate]) -> None:
+    """Top10 銘柄を Claude で分析して、レポートを Drive にアップロード。
+
+    各 Candidate に ``score`` と ``analysis_url`` を埋め込む（in-place）。
+    分析や Drive アップロードが失敗しても他銘柄の処理は続行する。
+    """
+    import os
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        logger.warning("ANTHROPIC_API_KEY 未設定のため US 分析をスキップ")
+        return
+
+    from . import analyzer, drive_writer  # 遅延 import で起動時の依存を抑える
+
+    today = (
+        __import__("datetime").datetime.utcnow()
+        + __import__("datetime").timedelta(hours=9)
+    ).strftime("%Y-%m-%d")
+
+    for c in candidates:
+        try:
+            ar = analyzer.analyze(c)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("%s の分析中に例外: %s", c.ticker, exc)
+            continue
+        if ar is None:
+            logger.warning("%s の分析結果が None", c.ticker)
+            continue
+
+        c.score = ar.score
+        logger.info(
+            "[US] %s: score=%s (tokens in/out=%s/%s)",
+            c.ticker, ar.score, ar.input_tokens, ar.output_tokens,
+        )
+
+        filename = f"{today}_{c.ticker}.md"
+        try:
+            url = drive_writer.upload_markdown(filename, ar.report_md)
+            if url:
+                c.analysis_url = url
+        except Exception as exc:  # noqa: BLE001
+            logger.error("%s レポートの Drive アップロード失敗: %s", c.ticker, exc)

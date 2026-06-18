@@ -25,15 +25,19 @@ TAB_NAME = {
 }
 
 HEADERS = [
-    "実行日", "Rank", "Ticker", "Company", "Sector",
+    "実行日", "Rank", "Ticker",
+    "Score",                     # NEW: Claude 分析の 100 点満点スコア (JP は空)
+    "Next Earnings",             # MOVED: Ticker のすぐ右に移動
+    "Company", "Sector",
     "Price", "Intrinsic", "MoS %",
     "DCF", "Graham", "Market Cap",
     "Rev Trend", "NI Trend",
-    "Prev Earnings", "Next Earnings",
+    "Prev Earnings",
     "RSI14", "RSI30", "RSI90",
     "BB Lower", "BB Middle", "BB Upper",
     "MACD (昨日)", "Signal (昨日)", "Hist (昨日)", "Cross (昨日)",
     "MACD (2日前)", "Signal (2日前)", "Hist (2日前)", "Cross (2日前)",
+    "Analysis Report",           # NEW: Drive 上の Markdown レポートへのリンク
 ]
 
 
@@ -71,21 +75,30 @@ def _candidate_row(date_str: str, rank: int, c: Candidate) -> list:
     bare = _bare_ticker(c.ticker, market)
     url = _quote_url(c.ticker, market)
     mos = round(v.margin_of_safety * 100, 2) if v.margin_of_safety is not None else ""
+    next_earnings = str(fu.next_earnings_date) if fu.next_earnings_date else ""
+    prev_earnings = str(fu.prev_earnings_date) if fu.prev_earnings_date else ""
+    analysis = (
+        f'=HYPERLINK("{c.analysis_url}","レポート")'
+        if c.analysis_url
+        else ""
+    )
     return [
         date_str, rank,
         f'=HYPERLINK("{url}","{bare}")',
+        _cell(c.score),                      # NEW: 100 点満点スコア (JP は空)
+        next_earnings,                       # MOVED: Ticker の隣に配置
         c.company or "", c.sector or "",
         _cell(v.price), _cell(v.intrinsic_value), mos,
         _cell(v.dcf_value), _cell(v.graham_value), _cell(fu.market_cap),
         _arrow(fu.revenue_growing), _arrow(fu.net_income_growing),
-        str(fu.prev_earnings_date) if fu.prev_earnings_date else "",
-        str(fu.next_earnings_date) if fu.next_earnings_date else "",
+        prev_earnings,
         _cell(t.rsi14), _cell(t.rsi30), _cell(t.rsi90),
         _cell(t.bb_lower), _cell(t.bb_middle), _cell(t.bb_upper),
         _cell(t.macd_yesterday), _cell(t.signal_yesterday), _cell(t.hist_yesterday),
         t.macd_cross_yesterday or "",
         _cell(t.macd_2days_ago), _cell(t.signal_2days_ago), _cell(t.hist_2days_ago),
         t.macd_cross_2days_ago or "",
+        analysis,                            # NEW: Drive レポートへのリンク
     ]
 
 

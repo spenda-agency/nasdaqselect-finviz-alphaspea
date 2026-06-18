@@ -24,7 +24,7 @@ concurrency:
 jobs:
   screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,9 +42,14 @@ jobs:
 
       - name: Run screening pipeline
         env:
-          # 出力先: Google Sheets (Service Account 認証)
+          # 出力先: Google Sheets / Drive (Service Account 認証、Drive scope 追加済み)
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID || '1GG561CtYIi30c3ljsDaAdUd2ddF18z4J21fQ-N-vo6Y' }}
+          DRIVE_FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID || '1e0_XPuoi6vh4-tkd-V3pwW-oV5M7p9JE' }}
+          # Claude による銘柄分析
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # SEC EDGAR は User-Agent 必須 (連絡先メール推奨)
+          EDGAR_USER_AGENT: ${{ vars.EDGAR_USER_AGENT || 'finviz-alphaspea-bot analytics@spenda-c.com' }}
           # 旧 Slack 設定 (現在は未使用、必要なら notify_slack.py から再有効化可)
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || 'C0B4BPA4W2D' }}

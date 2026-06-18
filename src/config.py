@@ -40,4 +40,7 @@ GROWTH_FLOOR = _f("DCF_GROWTH_FLOOR", 0.02)         # 成長率の下限
 # 通知対象とする最低限の安全域（Margin of Safety）
 MIN_MARGIN_OF_SAFETY = _f("MIN_MARGIN_OF_SAFETY", 0.15)
 
+# US 分析レポートの合格スコア（これ未満はシートから除外）
+MIN_ANALYSIS_SCORE = _i("MIN_ANALYSIS_SCORE", 75)
+
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
