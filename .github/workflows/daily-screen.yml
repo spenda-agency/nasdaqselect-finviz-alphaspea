@@ -1,10 +1,10 @@
 name: Daily undervalued Nasdaq screen
 
-on:
-  schedule:
+# on:
+  # schedule:
     # 月〜土 07:00 UTC = 月〜土 16:00 JST
     # 内訳: 月=JP のみ / 火〜金=US+JP / 土=US のみ（曜日判定は src/main.py で実施）
-    - cron: "0 7 * * 1-6"
+    # - cron: "0 7 * * 1-6"
   workflow_dispatch:
     inputs:
       dry_run:
